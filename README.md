@@ -1,8 +1,3 @@
-You're absolutely right to call that out. Your repo has a full database layer (`database.py`, `schemas.py`, `utils.py`, `pneumoai.db`) and a front-end structure (`static`, `templates`) that suggests this is a **full-stack FastAPI web application**, not just a simple API script.
-
-Here is the updated **Pro-README** that accurately reflects your actual project structure and the SQLite integration:
-
-```markdown
 # 🫁 PneumoAI: Full-Stack Pneumothorax Detection & Management System
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)

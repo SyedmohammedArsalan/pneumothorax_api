@@ -86,7 +86,3 @@ python -m uvicorn main:app --reload
 *Disclaimer: This tool is for educational/research purposes. Always consult a certified radiologist for medical diagnosis.*
 ```
 
-### 💡 Pro Tip for your VS Code:
-Since you have a `database.py`, make sure you don't delete `pneumoai.db` when you push to GitHub if you want your test data to stay there (though usually, we put `.db` files in `.gitignore` so users start with a fresh database). 
-
-Does the **Database Schema** section look correct based on how you designed `schemas.py`?

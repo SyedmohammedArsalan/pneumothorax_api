@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>PneumoAI — Pneumothorax Detection</title>
+<link rel="stylesheet" href="/static/style.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">🫁 PneumoAI</div>
+  <div class="nav-links">
+    <a href="#dashboard">Dashboard</a>
+    <a href="#detect">Detect</a>
+    <a href="#history">History</a>
+    <a href="#guide">Guide</a>
+    <a href="#emergency">Emergency</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-content">
+    <h1>AI-Powered Pneumothorax Detection</h1>
+    <p>Upload a chest X-ray for instant analysis using deep learning segmentation.</p>
+    <a href="#detect" class="btn-primary">Start Analysis →</a>
+  </div>
+  <div class="hero-badge">
+    <div class="badge-item"><span id="h-total">—</span><small>Total Scans</small></div>
+    <div class="badge-item"><span id="h-pos">—</span><small>Positive Cases</small></div>
+    <div class="badge-item"><span id="h-neg">—</span><small>Normal Cases</small></div>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section id="dashboard" class="section">
+  <h2 class="section-title">📊 Dashboard</h2>
+  <div class="cards-row">
+    <div class="card">
+      <div class="card-icon">🔬</div>
+      <div class="card-val" id="d-total">—</div>
+      <div class="card-label">Total Scans</div>
+    </div>
+    <div class="card card-red">
+      <div class="card-icon">⚠️</div>
+      <div class="card-val" id="d-pos">—</div>
+      <div class="card-label">Positive</div>
+    </div>
+    <div class="card card-green">
+      <div class="card-icon">✅</div>
+      <div class="card-val" id="d-neg">—</div>
+      <div class="card-label">Normal</div>
+    </div>
+    <div class="card card-blue">
+      <div class="card-icon">📈</div>
+      <div class="card-val" id="d-conf">—</div>
+      <div class="card-label">Avg Confidence</div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-box">
+      <h3>Detection Breakdown</h3>
+      <canvas id="donutChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3>Global Pneumothorax Stats (per 100k)</h3>
+      <canvas id="barChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3>Risk by Age Group</h3>
+      <canvas id="lineChart"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- DETECT -->
+<section id="detect" class="section dark-section">
+  <h2 class="section-title">🔍 Detect Pneumothorax</h2>
+  <div class="detect-container">
+    <div class="upload-zone" id="dropZone">
+      <div class="upload-icon">📂</div>
+      <p>Drag & Drop or Click to Upload Chest X-ray</p>
+      <small>PNG or JPEG accepted</small>
+      <input type="file" id="fileInput" accept="image/*" hidden/>
+    </div>
+
+    <div id="previewBox" class="hidden">
+      <img id="previewImg" alt="preview"/>
+      <button class="btn-primary" id="analyseBtn">🔍 Analyse X-ray</button>
+    </div>
+
+    <div id="loader" class="loader hidden">
+      <div class="spinner"></div>
+      <p>Running AI inference…</p>
+    </div>
+
+    <div id="resultBox" class="result-box hidden">
+      <div id="verdictBanner"></div>
+      <div class="result-images">
+        <div>
+          <h4>Segmentation Overlay</h4>
+          <img id="overlayImg" alt="overlay"/>
+        </div>
+        <div>
+          <h4>Probability Heatmap</h4>
+          <img id="heatmapImg" alt="heatmap"/>
+        </div>
+      </div>
+      <p class="disclaimer">⚕️ For research only. Always consult a radiologist.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HISTORY -->
+<section id="history" class="section">
+  <h2 class="section-title">🗂️ Scan History</h2>
+  <div id="historyTable">Loading…</div>
+</section>
+
+<!-- GUIDE -->
+<section id="guide" class="section dark-section">
+  <h2 class="section-title">📘 Lung Health Guide</h2>
+
+  <div class="guide-grid">
+    <div class="guide-card green-card">
+      <h3>✅ Do's</h3>
+      <ul>
+        <li>Exercise regularly — walking, swimming, yoga</li>
+        <li>Stay hydrated — 8 glasses of water daily</li>
+        <li>Practice deep breathing exercises</li>
+        <li>Maintain a healthy weight</li>
+        <li>Get annual chest X-rays if high risk</li>
+        <li>Sleep 7–8 hours to support lung recovery</li>
+      </ul>
+    </div>
+    <div class="guide-card red-card">
+      <h3>❌ Don'ts</h3>
+      <ul>
+        <li>Never smoke — including e-cigarettes</li>
+        <li>Avoid exposure to asbestos and dust</li>
+        <li>Don't ignore persistent chest pain</li>
+        <li>Avoid strenuous exercise with chest injury</li>
+        <li>Don't delay seeking care if breathless</li>
+        <li>Avoid high altitude if recently injured</li>
+      </ul>
+    </div>
+    <div class="guide-card blue-card">
+      <h3>🔍 How to Identify</h3>
+      <ul>
+        <li>Sudden sharp chest pain on one side</li>
+        <li>Shortness of breath at rest</li>
+        <li>Rapid heart rate (tachycardia)</li>
+        <li>Reduced breath sounds on one side</li>
+        <li>Shoulder or neck pain</li>
+        <li>Bluish skin (cyanosis) in severe cases</li>
+      </ul>
+    </div>
+    <div class="guide-card yellow-card">
+      <h3>💊 Treatment Overview</h3>
+      <ul>
+        <li>Small cases: observation & rest</li>
+        <li>Needle aspiration to remove air</li>
+        <li>Chest tube insertion for large cases</li>
+        <li>Surgery for recurrent pneumothorax</li>
+        <li>Oxygen therapy to aid reabsorption</li>
+        <li>Pleurodesis to prevent recurrence</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- EMERGENCY -->
+<section id="emergency" class="section emergency-section">
+  <h2 class="section-title">🚨 Emergency Warning Signs</h2>
+  <div class="emergency-grid">
+    <div class="emergency-card">
+      <div class="emergency-icon">😮‍💨</div>
+      <h4>Breathing Difficulty</h4>
+      <p>Cannot complete a full breath, gasping at rest</p>
+    </div>
+    <div class="emergency-card">
+      <div class="emergency-icon">💙</div>
+      <h4>Bluish Lips or Skin</h4>
+      <p>Cyanosis indicates critically low oxygen levels</p>
+    </div>
+    <div class="emergency-card">
+      <div class="emergency-icon">❤️</div>
+      <h4>Racing Heart</h4>
+      <p>Heart rate over 120 bpm with chest pain</p>
+    </div>
+    <div class="emergency-card">
+      <div class="emergency-icon">😵</div>
+      <h4>Loss of Consciousness</h4>
+      <p>Fainting or confusion alongside chest symptoms</p>
+    </div>
+  </div>
+  <div class="emergency-banner">
+    <h3>⚡ If you experience any of the above — call emergency services immediately</h3>
+    <div class="hotlines">
+      <span>🇵🇰 Pakistan: <strong>1122</strong></span>
+      <span>🇺🇸 USA: <strong>911</strong></span>
+      <span>🇬🇧 UK: <strong>999</strong></span>
+      <span>🌍 International: <strong>112</strong></span>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>🫁 PneumoAI — Research Tool Only | Not a Medical Device</p>
+  <p>Model: EfficientNet-b0 + U-Net | Val Dice: 0.7921 | Threshold: 0.86</p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

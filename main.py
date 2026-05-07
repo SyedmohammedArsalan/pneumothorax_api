@@ -9,15 +9,19 @@ from PIL import Image
 from model    import ModelService
 from database import init_db, save_scan, get_history, get_stats
 from schemas  import PredictionResponse, StatsResponse
-from utils    import make_overlay, make_heatmap
+from utils    import make_overlay, make_heatmap, calculate_severity   # <-- added calculate_severity
 
-# NEW: Authentication imports
+# Authentication imports
 from auth import (
     UserRegister, UserLogin, Token,
     get_password_hash, verify_password,
     create_access_token, get_current_user, UserInDB,
     get_user_by_username, get_user_by_email, create_user
 )
+
+# Local chatbot (rule-based, no API)
+from llm_chatbot import get_llm_response
+from pydantic import BaseModel
 
 PKL_PATH = "pneumothorax_deployment_v1.pkl"
 service  = ModelService()
@@ -46,7 +50,7 @@ def get_service():
 
 
 # =====================================================
-# PUBLIC PAGES (no auth required)
+# PUBLIC PAGES
 # =====================================================
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -84,16 +88,14 @@ async def login(user: UserLogin):
 
 
 # =====================================================
-# PROTECTED API ENDPOINTS (require valid token)
+# PROTECTED API ENDPOINTS
 # =====================================================
 @app.get("/api/health")
 def health():
-    # Public health check (no auth)
     return {"status": "ok", "model_loaded": service.model is not None}
 
 @app.get("/api/stats", response_model=StatsResponse)
 async def stats(current_user: UserInDB = Depends(get_current_user)):
-    # User-specific stats
     return StatsResponse(**get_stats(user_id=current_user.id))
 
 @app.get("/api/history")
@@ -115,7 +117,6 @@ async def predict(
     except Exception:
         raise HTTPException(400, "Cannot read image.")
 
-    # Save upload
     ext      = os.path.splitext(file.filename)[1] or ".png"
     fname    = f"{uuid.uuid4().hex}{ext}"
     fpath    = os.path.join("uploads", fname)
@@ -124,9 +125,13 @@ async def predict(
 
     result  = svc.predict(pil_img)
     overlay = heatmap = None
+    severity_info = None  # NEW
+
     if result["has_pneumothorax"]:
         overlay = make_overlay(pil_img, result["binary_mask"])
         heatmap = make_heatmap(result["prob_map"])
+        # Calculate severity from binary mask
+        severity_info = calculate_severity(result["binary_mask"])
 
     verdict = (
         f"⚠️ Pneumothorax Detected — {result['confidence']*100:.1f}% confidence"
@@ -134,7 +139,6 @@ async def predict(
         else f"✅ No Pneumothorax — {result['confidence']*100:.1f}% probability"
     )
 
-    # Save with user_id
     save_scan(file.filename, fpath, verdict,
               result["confidence"], result["has_pneumothorax"],
               user_id=current_user.id)
@@ -148,6 +152,7 @@ async def predict(
         overlay_b64      = overlay,
         heatmap_b64      = heatmap,
         scan_id          = scan_id,
+        severity         = severity_info
     )
 
 @app.get("/api/scan/{scan_id}/image")
@@ -158,7 +163,22 @@ def get_scan_image(scan_id: int, current_user: UserInDB = Depends(get_current_us
     con.close()
     if not row or not os.path.exists(row[0]):
         raise HTTPException(404, "Not found.")
-    # Optional: check if scan belongs to current user
     if row[1] != current_user.id:
         raise HTTPException(403, "Access denied")
     return FileResponse(row[0])
+
+
+# =====================================================
+# CHATBOT ENDPOINT (local rule‑based, reliable)
+# =====================================================
+class ChatRequest(BaseModel):
+    message: str
+
+class ChatResponse(BaseModel):
+    reply: str
+    found_match: bool
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest, current_user: UserInDB = Depends(get_current_user)):
+    reply, found = get_llm_response(request.message)
+    return ChatResponse(reply=reply, found_match=found)

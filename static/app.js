@@ -21,79 +21,100 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 // =====================================================
-// STATS & CHARTS (with auth)
+// STATS & CHARTS (safely destroy old charts)
 // =====================================================
 async function loadStats() {
     const r = await fetchWithAuth('/api/stats');
     const d = await r.json();
 
-    ['total','pos','neg'].forEach(k => {
-        const val = d[k === 'pos' ? 'positive' : k === 'neg' ? 'negative' : 'total'];
-        document.getElementById(`h-${k}`).textContent = val;
-        document.getElementById(`d-${k}`).textContent = val;
-    });
-    document.getElementById('d-conf').textContent =
-        (d.avg_confidence * 100).toFixed(1) + '%';
+    // Hero stats
+    document.getElementById('hero-total').textContent = d.total;
+    document.getElementById('hero-pos').textContent = d.positive;
+    document.getElementById('hero-neg').textContent = d.negative;
 
-    if (window.donutChart) window.donutChart.destroy();
-    window.donutChart = new Chart(document.getElementById('donutChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Positive', 'Normal'],
-            datasets: [{ data: [d.positive, d.negative],
-                         backgroundColor: ['#ef4444','#10b981'], borderWidth: 0 }]
-        },
-        options: { plugins: { legend: { labels: { color: '#e2e8f0' }}},
-                   cutout: '65%' }
-    });
+    // Dashboard stat cards
+    document.getElementById('d-total').textContent = d.total;
+    document.getElementById('d-pos').textContent = d.positive;
+    document.getElementById('d-neg').textContent = d.negative;
+    document.getElementById('d-conf').textContent = (d.avg_confidence * 100).toFixed(1) + '%';
+
+    // Safely destroy existing donut chart if it exists
+    if (window.donutChart && typeof window.donutChart.destroy === 'function') {
+        window.donutChart.destroy();
+    }
+    
+    // Create new donut chart
+    const donutCanvas = document.getElementById('donutChart');
+    if (donutCanvas) {
+        window.donutChart = new Chart(donutCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: ['Positive', 'Normal'],
+                datasets: [{ data: [d.positive, d.negative],
+                             backgroundColor: ['#ef4444','#10b981'], borderWidth: 0 }]
+            },
+            options: { plugins: { legend: { labels: { color: '#e2e8f0' }}},
+                       cutout: '65%' }
+        });
+    }
 }
 
-// Global stats (static reference data - unchanged)
-if (document.getElementById('barChart')) {
-    new Chart(document.getElementById('barChart'), {
-        type: 'bar',
-        data: {
-            labels: ['USA','UK','Germany','Australia','Pakistan','India','Canada'],
-            datasets: [{
-                label: 'Cases per 100k',
-                data: [18, 15, 12, 14, 8, 7, 16],
-                backgroundColor: '#3b82f6'
-            }]
-        },
-        options: {
-            plugins: { legend: { labels: { color: '#e2e8f0' }}},
-            scales: {
-                x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' }},
-                y: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' }}
+// Initialize global charts once (not recreated on each loadStats)
+function initGlobalCharts() {
+    // Bar chart
+    const barCanvas = document.getElementById('barChart');
+    if (barCanvas && !window.barChart) {
+        window.barChart = new Chart(barCanvas, {
+            type: 'bar',
+            data: {
+                labels: ['USA','UK','Germany','Australia','Pakistan','India','Canada'],
+                datasets: [{
+                    label: 'Cases per 100k',
+                    data: [18, 15, 12, 14, 8, 7, 16],
+                    backgroundColor: '#14b8a6'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { labels: { color: '#e2e8f0' }}},
+                scales: {
+                    x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' }},
+                    y: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' }}
+                }
             }
-        }
-    });
-}
-
-if (document.getElementById('lineChart')) {
-    new Chart(document.getElementById('lineChart'), {
-        type: 'line',
-        data: {
-            labels: ['0-10','11-20','21-30','31-40','41-50','51-60','60+'],
-            datasets: [{
-                label: 'Risk Score',
-                data: [2, 15, 28, 18, 12, 9, 6],
-                borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',
-                tension: 0.4, fill: true
-            }]
-        },
-        options: {
-            plugins: { legend: { labels: { color: '#e2e8f0' }}},
-            scales: {
-                x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' }},
-                y: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' }}
+        });
+    }
+    
+    // Line chart
+    const lineCanvas = document.getElementById('lineChart');
+    if (lineCanvas && !window.lineChart) {
+        window.lineChart = new Chart(lineCanvas, {
+            type: 'line',
+            data: {
+                labels: ['0-10','11-20','21-30','31-40','41-50','51-60','60+'],
+                datasets: [{
+                    label: 'Risk Score',
+                    data: [2, 15, 28, 18, 12, 9, 6],
+                    borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',
+                    tension: 0.4, fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { labels: { color: '#e2e8f0' }}},
+                scales: {
+                    x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' }},
+                    y: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' }}
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 // =====================================================
-// HISTORY (with auth)
+// HISTORY
 // =====================================================
 async function loadHistory() {
     const r    = await fetchWithAuth('/api/history');
@@ -101,19 +122,24 @@ async function loadHistory() {
     const el   = document.getElementById('historyTable');
 
     if (!data.length) {
-        el.innerHTML = '<p style="color:var(--muted)">No scans yet.</p>';
+        el.innerHTML = '<div class="history-row"><span style="color:var(--muted)">No scans yet.</span></div>';
         return;
     }
 
-    el.innerHTML = `
+    let html = `
         <div class="history-row header">
-            <span>#</span><span>Filename</span><span>Result</span>
-            <span>Confidence</span><span>Date</span>
+            <span>#</span>
+            <span>Filename</span>
+            <span>Result</span>
+            <span>Confidence</span>
+            <span>Date</span>
         </div>
-        ${data.map(s => `
+    `;
+    data.forEach(s => {
+        html += `
         <div class="history-row">
             <span style="color:var(--muted)">${s.id}</span>
-            <span>${s.filename}</span>
+            <span>${escapeHtml(s.filename)}</span>
             <span class="${s.has_ptx ? 'tag-pos' : 'tag-neg'}">
                 ${s.has_ptx ? '⚠️ Positive' : '✅ Normal'}
             </span>
@@ -121,12 +147,25 @@ async function loadHistory() {
             <span style="color:var(--muted);font-size:.8rem">
                 ${new Date(s.created_at).toLocaleString()}
             </span>
-        </div>`).join('')}
-    `;
+        </div>
+        `;
+    });
+    el.innerHTML = html;
+}
+
+// Helper to escape HTML
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
 }
 
 // =====================================================
-// UPLOAD & PREDICT (with auth)
+// UPLOAD & PREDICT
 // =====================================================
 const dropZone   = document.getElementById('dropZone');
 const fileInput  = document.getElementById('fileInput');
@@ -139,9 +178,9 @@ let   selectedFile = null;
 
 if (dropZone) {
     dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor='#3b82f6' });
-    dropZone.addEventListener('dragleave', () => dropZone.style.borderColor='');
-    dropZone.addEventListener('drop', e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]) });
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#14b8a6'; });
+    dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = '');
+    dropZone.addEventListener('drop', e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
 }
 if (fileInput) fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
 
@@ -168,20 +207,35 @@ if (analyseBtn) {
             const d = await r.json();
             if (!r.ok) throw new Error(d.detail);
 
+            // Verdict banner
             const banner = document.getElementById('verdictBanner');
             banner.textContent = d.verdict;
-            banner.className = d.has_pneumothorax ? 'verdict-pos' : 'verdict-neg';
+            banner.className = 'verdict-banner ' + (d.has_pneumothorax ? 'verdict-pos' : 'verdict-neg');
 
+            // Severity display (if positive)
+            const severityBox = document.getElementById('severityBox');
+            if (d.severity && d.has_pneumothorax) {
+                severityBox.style.display = 'block';
+                document.getElementById('severityPercent').innerHTML = `<strong>${d.severity.level}</strong> (${d.severity.percentage}% of lung field)`;
+                const bar = document.getElementById('severityBar');
+                bar.style.width = `${Math.min(d.severity.percentage, 100)}%`;
+                bar.style.backgroundColor = d.severity.color;
+                document.getElementById('severityDesc').innerText = d.severity.description;
+            } else {
+                severityBox.style.display = 'none';
+            }
+
+            // Overlay and heatmap images
             const overlayImg  = document.getElementById('overlayImg');
             const heatmapImg  = document.getElementById('heatmapImg');
-            const resultImages = document.querySelector('.result-images');
+            const resultImages = document.querySelector('.analysis-grid');
 
             if (d.has_pneumothorax && d.overlay_b64) {
                 overlayImg.src  = 'data:image/png;base64,' + d.overlay_b64;
                 heatmapImg.src  = 'data:image/png;base64,' + d.heatmap_b64;
-                resultImages.style.display = 'grid';
+                if (resultImages) resultImages.style.display = 'grid';
             } else {
-                resultImages.style.display = 'none';
+                if (resultImages) resultImages.style.display = 'none';
             }
 
             resultBox.classList.remove('hidden');
@@ -197,19 +251,20 @@ if (analyseBtn) {
 }
 
 // =====================================================
-// INIT (only if we are on the main page)
+// INIT with token check and global charts
 // =====================================================
 if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
     if (!localStorage.getItem('access_token')) {
         window.location.href = '/login';
     } else {
+        initGlobalCharts();  // one-time init
         loadStats();
         loadHistory();
     }
 }
 
 // =====================================================
-// LOGOUT BUTTON HANDLER (new)
+// LOGOUT
 // =====================================================
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) {

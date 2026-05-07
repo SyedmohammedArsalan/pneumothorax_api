@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, Dict, Any
 
 class PredictionResponse(BaseModel):
     has_pneumothorax: bool
@@ -8,6 +8,7 @@ class PredictionResponse(BaseModel):
     overlay_b64:      Optional[str]
     heatmap_b64:      Optional[str]
     scan_id:          int
+    severity:         Optional[Dict[str, Any]] = None   # NEW
 
 class ScanHistory(BaseModel):
     id:         int

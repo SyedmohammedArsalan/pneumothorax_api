@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PneumoAI - Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .auth-container {
+            max-width: 400px;
+            margin: 80px auto;
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid #1e293b;
+        }
+        .auth-container h2 {
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .auth-form input {
+            width: 100%;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
+            background: var(--bg2);
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            color: var(--text);
+        }
+        .auth-form button {
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+        .toggle-auth {
+            text-align: center;
+            margin-top: 1rem;
+            color: var(--muted);
+        }
+        .toggle-auth a {
+            color: var(--accent);
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .error-msg {
+            color: var(--red);
+            font-size: 0.85rem;
+            margin-top: -0.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h2>🔐 PneumoAI Access</h2>
+        
+        <!-- Login Form -->
+        <div id="loginForm">
+            <form class="auth-form" id="loginFormElement">
+                <input type="text" id="loginUsername" placeholder="Username" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <div class="error-msg" id="loginError"></div>
+                <button type="submit" class="btn-primary">Login</button>
+            </form>
+            <div class="toggle-auth">
+                Don't have an account? <a id="showRegister">Register here</a>
+            </div>
+        </div>
+
+        <!-- Register Form (hidden initially) -->
+        <div id="registerForm" style="display: none;">
+            <form class="auth-form" id="registerFormElement">
+                <input type="text" id="regUsername" placeholder="Username" required>
+                <input type="email" id="regEmail" placeholder="Email" required>
+                <input type="password" id="regPassword" placeholder="Password" required>
+                <div class="error-msg" id="regError"></div>
+                <button type="submit" class="btn-primary">Register</button>
+            </form>
+            <div class="toggle-auth">
+                Already have an account? <a id="showLogin">Login here</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle between login and register
+        document.getElementById('showRegister').onclick = () => {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+        };
+        document.getElementById('showLogin').onclick = () => {
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+        };
+
+        // Handle Login
+        document.getElementById('loginFormElement').onsubmit = async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            try {
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('access_token', data.access_token);
+                    window.location.href = '/';
+                } else {
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerText = data.detail || 'Login failed';
+                }
+            } catch (err) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerText = 'Network error';
+            }
+        };
+
+        // Handle Registration
+        document.getElementById('registerFormElement').onsubmit = async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const errorDiv = document.getElementById('regError');
+            
+            try {
+                const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('access_token', data.access_token);
+                    window.location.href = '/';
+                } else {
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerText = data.detail || 'Registration failed';
+                }
+            } catch (err) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerText = 'Network error';
+            }
+        };
+    </script>
+</body>
+</html>

@@ -11,6 +11,14 @@ from database import init_db, save_scan, get_history, get_stats
 from schemas  import PredictionResponse, StatsResponse
 from utils    import make_overlay, make_heatmap
 
+# NEW: Authentication imports
+from auth import (
+    UserRegister, UserLogin, Token,
+    get_password_hash, verify_password,
+    create_access_token, get_current_user, UserInDB,
+    get_user_by_username, get_user_by_email, create_user
+)
+
 PKL_PATH = "pneumothorax_deployment_v1.pkl"
 service  = ModelService()
 
@@ -37,32 +45,66 @@ def get_service():
     return service
 
 
-# ── Pages ─────────────────────────────────────────────────────────────────
+# =====================================================
+# PUBLIC PAGES (no auth required)
+# =====================================================
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
-# ── API ───────────────────────────────────────────────────────────────────
+
+# =====================================================
+# AUTHENTICATION ENDPOINTS
+# =====================================================
+@app.post("/auth/register", response_model=Token)
+async def register(user: UserRegister):
+    if get_user_by_username(user.username):
+        raise HTTPException(400, "Username already taken")
+    if get_user_by_email(user.email):
+        raise HTTPException(400, "Email already registered")
+    
+    hashed_pw = get_password_hash(user.password)
+    user_id = create_user(user.username, user.email, hashed_pw)
+    
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/auth/login", response_model=Token)
+async def login(user: UserLogin):
+    db_user = get_user_by_username(user.username)
+    if not db_user or not verify_password(user.password, db_user["hashed_password"]):
+        raise HTTPException(401, detail="Incorrect username or password")
+    
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# =====================================================
+# PROTECTED API ENDPOINTS (require valid token)
+# =====================================================
 @app.get("/api/health")
 def health():
+    # Public health check (no auth)
     return {"status": "ok", "model_loaded": service.model is not None}
 
-
 @app.get("/api/stats", response_model=StatsResponse)
-def stats():
-    return StatsResponse(**get_stats())
-
+async def stats(current_user: UserInDB = Depends(get_current_user)):
+    # User-specific stats
+    return StatsResponse(**get_stats(user_id=current_user.id))
 
 @app.get("/api/history")
-def history():
-    return get_history(20)
-
+async def history(current_user: UserInDB = Depends(get_current_user)):
+    return get_history(20, user_id=current_user.id)
 
 @app.post("/api/predict", response_model=PredictionResponse)
 async def predict(
     file: UploadFile = File(...),
-    svc:  ModelService = Depends(get_service),
+    svc: ModelService = Depends(get_service),
+    current_user: UserInDB = Depends(get_current_user),
 ):
     if file.content_type not in ("image/jpeg", "image/png"):
         raise HTTPException(422, "JPEG or PNG only.")
@@ -92,10 +134,12 @@ async def predict(
         else f"✅ No Pneumothorax — {result['confidence']*100:.1f}% probability"
     )
 
+    # Save with user_id
     save_scan(file.filename, fpath, verdict,
-              result["confidence"], result["has_pneumothorax"])
+              result["confidence"], result["has_pneumothorax"],
+              user_id=current_user.id)
 
-    scan_id = get_history(1)[0]["id"]
+    scan_id = get_history(1, user_id=current_user.id)[0]["id"]
 
     return PredictionResponse(
         has_pneumothorax = result["has_pneumothorax"],
@@ -106,14 +150,15 @@ async def predict(
         scan_id          = scan_id,
     )
 
-
 @app.get("/api/scan/{scan_id}/image")
-def get_scan_image(scan_id: int):
+def get_scan_image(scan_id: int, current_user: UserInDB = Depends(get_current_user)):
     import sqlite3
     con = sqlite3.connect("pneumoai.db")
-    row = con.execute("SELECT filepath FROM scans WHERE id=?",
-                      (scan_id,)).fetchone()
+    row = con.execute("SELECT filepath, user_id FROM scans WHERE id=?", (scan_id,)).fetchone()
     con.close()
     if not row or not os.path.exists(row[0]):
         raise HTTPException(404, "Not found.")
+    # Optional: check if scan belongs to current user
+    if row[1] != current_user.id:
+        raise HTTPException(403, "Access denied")
     return FileResponse(row[0])

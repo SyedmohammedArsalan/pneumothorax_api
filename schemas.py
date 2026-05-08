@@ -8,7 +8,9 @@ class PredictionResponse(BaseModel):
     overlay_b64:      Optional[str]
     heatmap_b64:      Optional[str]
     scan_id:          int
-    severity:         Optional[Dict[str, Any]] = None   # NEW
+    severity:         Optional[Dict[str, Any]] = None
+    reliability:      Optional[Dict[str, Any]] = None   # NEW
+    gradcam_b64:      Optional[str] = None              # NEW
 
 class ScanHistory(BaseModel):
     id:         int

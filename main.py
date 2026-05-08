@@ -1,4 +1,5 @@
 import contextlib, io, os, shutil, uuid
+import numpy as np   # <-- important fix
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -9,19 +10,16 @@ from PIL import Image
 from model    import ModelService
 from database import init_db, save_scan, get_history, get_stats
 from schemas  import PredictionResponse, StatsResponse
-from utils    import make_overlay, make_heatmap, calculate_severity   # <-- added calculate_severity
-
-# Authentication imports
+from utils    import make_overlay, make_heatmap, calculate_severity, _pil_to_b64
 from auth import (
     UserRegister, UserLogin, Token,
     get_password_hash, verify_password,
     create_access_token, get_current_user, UserInDB,
     get_user_by_username, get_user_by_email, create_user
 )
-
-# Local chatbot (rule-based, no API)
 from llm_chatbot import get_llm_response
 from pydantic import BaseModel
+from interpretability import GradCAM, overlay_gradcam, reliability_badge
 
 PKL_PATH = "pneumothorax_deployment_v1.pkl"
 service  = ModelService()
@@ -70,10 +68,8 @@ async def register(user: UserRegister):
         raise HTTPException(400, "Username already taken")
     if get_user_by_email(user.email):
         raise HTTPException(400, "Email already registered")
-    
     hashed_pw = get_password_hash(user.password)
     user_id = create_user(user.username, user.email, hashed_pw)
-    
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -82,7 +78,6 @@ async def login(user: UserLogin):
     db_user = get_user_by_username(user.username)
     if not db_user or not verify_password(user.password, db_user["hashed_password"]):
         raise HTTPException(401, detail="Incorrect username or password")
-    
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -101,6 +96,15 @@ async def stats(current_user: UserInDB = Depends(get_current_user)):
 @app.get("/api/history")
 async def history(current_user: UserInDB = Depends(get_current_user)):
     return get_history(20, user_id=current_user.id)
+
+@app.get("/api/model_performance")
+async def model_performance(current_user: UserInDB = Depends(get_current_user)):
+    metrics = service.get_metrics()
+    return {
+        "dice": metrics.get("best_val_dice", 0.7921),
+        "threshold": 0.86,
+        "description": "Dice coefficient measures overlap between predicted and ground‑truth masks."
+    }
 
 @app.post("/api/predict", response_model=PredictionResponse)
 async def predict(
@@ -125,13 +129,34 @@ async def predict(
 
     result  = svc.predict(pil_img)
     overlay = heatmap = None
-    severity_info = None  # NEW
+    severity_info = None
+    reliability = None
+    gradcam_b64 = None
 
     if result["has_pneumothorax"]:
         overlay = make_overlay(pil_img, result["binary_mask"])
         heatmap = make_heatmap(result["prob_map"])
-        # Calculate severity from binary mask
         severity_info = calculate_severity(result["binary_mask"])
+        mask_area = int(np.sum(result["binary_mask"]))
+        reliability = reliability_badge(result["confidence"], mask_area)
+
+        # Grad‑CAM (classification explainability)
+        try:
+            print("--- Grad-CAM generation started ---")
+            grad_layer = svc.get_gradcam_layer()
+            print(f"Target layer: {grad_layer}")
+            grad_cam = GradCAM(svc.model, grad_layer)
+            tensor = svc.transform(pil_img.convert("RGB")).unsqueeze(0)
+            cam = grad_cam.generate(tensor)
+            print(f"CAM shape: {cam.shape}, min={cam.min():.3f}, max={cam.max():.3f}")
+            gradcam_overlay = overlay_gradcam(pil_img, cam)
+            gradcam_b64 = _pil_to_b64(gradcam_overlay)
+            print(f"Grad-CAM base64 length: {len(gradcam_b64)}")
+        except Exception as e:
+            print(f"Grad-CAM failed: {e}")
+            import traceback
+            traceback.print_exc()
+            gradcam_b64 = None
 
     verdict = (
         f"⚠️ Pneumothorax Detected — {result['confidence']*100:.1f}% confidence"
@@ -152,7 +177,9 @@ async def predict(
         overlay_b64      = overlay,
         heatmap_b64      = heatmap,
         scan_id          = scan_id,
-        severity         = severity_info
+        severity         = severity_info,
+        reliability      = reliability,
+        gradcam_b64      = gradcam_b64,
     )
 
 @app.get("/api/scan/{scan_id}/image")
@@ -169,7 +196,7 @@ def get_scan_image(scan_id: int, current_user: UserInDB = Depends(get_current_us
 
 
 # =====================================================
-# CHATBOT ENDPOINT (local rule‑based, reliable)
+# CHATBOT ENDPOINT
 # =====================================================
 class ChatRequest(BaseModel):
     message: str

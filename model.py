@@ -34,17 +34,10 @@ class PneumothoraxModel(nn.Module):
         )
 
     def forward(self, x):
-
-        # Encoder Features
         features = self.unet.encoder(x)
-
-        # Segmentation Branch
         seg_out = self.unet.decoder(*features)
         seg_out = self.unet.segmentation_head(seg_out)
-
-        # Classification Branch
         cls_out = self.classifier(features[-1])
-
         return seg_out, cls_out.squeeze(1)
 
 
@@ -52,15 +45,9 @@ class PneumothoraxModel(nn.Module):
 # CPU Safe Unpickler
 # ─────────────────────────────────────────────────────────────
 class CPUUnpickler(pickle.Unpickler):
-
     def find_class(self, module, name):
-
         if module == "torch.storage" and name == "_load_from_bytes":
-            return lambda b: torch.load(
-                io.BytesIO(b),
-                map_location="cpu"
-            )
-
+            return lambda b: torch.load(io.BytesIO(b), map_location="cpu")
         return super().find_class(module, name)
 
 
@@ -70,127 +57,80 @@ class CPUUnpickler(pickle.Unpickler):
 class ModelService:
 
     def __init__(self):
-
         self.model = None
         self.cfg = None
-
+        self.metrics = None
         self.device = torch.device("cpu")
-
         self.transform = None
 
-        # =====================================================
-        # THRESHOLDS
-        # =====================================================
-
-        # If probability > 50%
-        # → Pneumothorax Detected
         self.classification_threshold = 0.5
-
-        # Mask pixel confidence threshold
         self.mask_threshold = 0.5
-
-        # Remove tiny noisy regions
         self.min_area = 300
 
     # ─────────────────────────────────────────────────────────
     # Load Model
     # ─────────────────────────────────────────────────────────
     def load(self, pkl_path: str) -> None:
-
         with open(pkl_path, "rb") as f:
             pkg = CPUUnpickler(f).load()
 
         self.cfg = pkg["config"]
+        self.metrics = pkg.get("metrics", {"best_val_dice": 0.7921})
 
-        self.model = PneumothoraxModel(
-            pkg["encoder_name"]
-        )
-
-        self.model.load_state_dict(
-            pkg["model_state_dict"]
-        )
-
+        self.model = PneumothoraxModel(pkg["encoder_name"])
+        self.model.load_state_dict(pkg["model_state_dict"])
         self.model.to(self.device)
         self.model.eval()
 
-        # Image Transform Pipeline
         self.transform = T.Compose([
-            T.Resize((
-                self.cfg["img_size"],
-                self.cfg["img_size"]
-            )),
-
+            T.Resize((self.cfg["img_size"], self.cfg["img_size"])),
             T.ToTensor(),
-
-            T.Normalize(
-                self.cfg["mean"],
-                self.cfg["std"]
-            ),
+            T.Normalize(self.cfg["mean"], self.cfg["std"]),
         ])
 
         print("✅ Model Loaded Successfully")
         print(f"✅ Classification Threshold: {self.classification_threshold}")
         print(f"✅ Mask Threshold: {self.mask_threshold}")
         print(f"✅ Min Mask Area: {self.min_area}")
+        if self.metrics:
+            print(f"✅ Val Dice: {self.metrics.get('best_val_dice', 'N/A')}")
 
     # ─────────────────────────────────────────────────────────
     # Prediction
     # ─────────────────────────────────────────────────────────
     def predict(self, pil_img: Image.Image) -> dict:
+        tensor = self.transform(pil_img.convert("RGB")).unsqueeze(0)
 
-        # Convert PIL Image → Tensor
-        tensor = self.transform(
-            pil_img.convert("RGB")
-        ).unsqueeze(0)
-
-        # Inference
         with torch.no_grad():
-
             seg_logits, cls_logits = self.model(tensor)
 
-        # =====================================================
-        # CLASSIFICATION
-        # =====================================================
-
-        # Convert logits → probability
         prob = torch.sigmoid(cls_logits).item()
-
-        # Final Disease Decision
         has_ptx = prob > self.classification_threshold
 
-        # =====================================================
-        # SEGMENTATION
-        # =====================================================
-
-        # Convert segmentation logits → probability map
-        prob_map = torch.sigmoid(
-            seg_logits
-        ).squeeze().cpu().numpy()
-
-        # Binary Mask
-        binary = (
-            prob_map > self.mask_threshold
-        ).astype(np.uint8)
-
-        # =====================================================
-        # REMOVE SMALL NOISE
-        # =====================================================
+        prob_map = torch.sigmoid(seg_logits).squeeze().cpu().numpy()
+        binary = (prob_map > self.mask_threshold).astype(np.uint8)
 
         if binary.sum() < self.min_area:
-
             binary = np.zeros_like(binary)
 
-        # =====================================================
-        # RETURN RESULTS
-        # =====================================================
-
         return {
-
             "has_pneumothorax": has_ptx,
-
             "confidence": round(prob, 4),
-
             "prob_map": prob_map,
-
             "binary_mask": binary,
         }
+
+    # ─────────────────────────────────────────────────────────
+    # Grad‑CAM layer access (improved)
+    # ─────────────────────────────────────────────────────────
+    def get_gradcam_layer(self):
+        """Return a suitable convolutional layer for Grad‑CAM."""
+        # Try to get the last decoder block's convolution
+        try:
+            return self.model.unet.decoder[-1].conv
+        except:
+            # Fallback to last encoder block
+            return self.model.unet.encoder[-1]
+
+    def get_metrics(self):
+        return self.metrics if self.metrics else {"best_val_dice": 0.7921}

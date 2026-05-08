@@ -1,323 +1,345 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PneumoAI — AI-Driven Pneumothorax Detection</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="/static/style.css"/>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>PneumoAI — Pneumothorax Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/style.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-  <!-- Animated Background -->
-  <div class="animated-bg">
-    <div class="gradient-sphere"></div>
-    <div class="gradient-sphere delay-1"></div>
-    <div class="gradient-sphere delay-2"></div>
+<!-- Animated Background -->
+<div class="animated-bg">
+  <div class="gradient-sphere"></div>
+  <div class="gradient-sphere delay-1"></div>
+  <div class="gradient-sphere delay-2"></div>
+</div>
+
+<!-- Glass Navigation -->
+<nav class="glass-nav">
+  <div class="nav-container">
+    <div class="logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 2L2 9L16 16L30 9L16 2Z" stroke="#14b8a6" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M2 9L2 23L16 30L30 23L30 9" stroke="#14b8a6" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M16 16L16 30" stroke="#14b8a6" stroke-width="1.5"/>
+      </svg>
+      <span>Pneumo<span class="accent">AI</span></span>
+    </div>
+    <div class="nav-links">
+      <a href="#dashboard" class="nav-link">Dashboard</a>
+      <a href="#detect" class="nav-link">Detect</a>
+      <a href="#history" class="nav-link">History</a>
+      <a href="#insights" class="nav-link">Resources</a>
+      <button id="logoutBtn" class="logout-btn">Logout</button>
+    </div>
+  </div>
+</nav>
+
+<main class="main-content">
+  
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="badge">AI-Powered Medical Imaging</span>
+      </div>
+      <h1>Instant Pneumothorax Detection <span class="accent">with Precision</span></h1>
+      <p>Upload a chest X-ray and get a detailed analysis including probability scores, segmentation overlays, and severity estimation — all in seconds.</p>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <span class="stat-number" id="hero-total">—</span>
+          <span class="stat-label">Total Scans</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number" id="hero-pos">—</span>
+          <span class="stat-label">Positive Cases</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number" id="hero-neg">—</span>
+          <span class="stat-label">Normal Scans</span>
+        </div>
+      </div>
+      <a href="#detect" class="cta-button">Start Analysis →</a>
+    </div>
+    <div class="hero-visual">
+      <div class="lung-visual">
+        <div class="lung-outline"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dashboard Section -->
+  <section id="dashboard" class="section dashboard-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Clinical Dashboard</h2>
+        <div class="section-header-line"></div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card glass">
+          <div class="stat-icon">📋</div>
+          <div class="stat-info">
+            <span class="stat-value" id="d-total">—</span>
+            <span class="stat-title">Total Scans</span>
+          </div>
+        </div>
+        <div class="stat-card glass red">
+          <div class="stat-icon">⚠️</div>
+          <div class="stat-info">
+            <span class="stat-value" id="d-pos">—</span>
+            <span class="stat-title">Pneumothorax Detected</span>
+          </div>
+        </div>
+        <div class="stat-card glass green">
+          <div class="stat-icon">✅</div>
+          <div class="stat-info">
+            <span class="stat-value" id="d-neg">—</span>
+            <span class="stat-title">Normal Findings</span>
+          </div>
+        </div>
+        <div class="stat-card glass accent">
+          <div class="stat-icon">📈</div>
+          <div class="stat-info">
+            <span class="stat-value" id="d-conf">—</span>
+            <span class="stat-title">Avg Confidence</span>
+          </div>
+        </div>
+        <!-- NEW: Model metrics card (Dice score) -->
+        <div class="stat-card glass" id="modelMetricsCard">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-info">
+            <span class="stat-value" id="diceValue">—</span>
+            <span class="stat-title">Validation Dice Score</span>
+          </div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card glass">
+          <h3>Detection Breakdown</h3>
+          <canvas id="donutChart"></canvas>
+        </div>
+        <div class="chart-card glass">
+          <h3>Global Incidence per 100k</h3>
+          <canvas id="barChart"></canvas>
+        </div>
+        <div class="chart-card glass">
+          <h3>Risk by Age Group</h3>
+          <canvas id="lineChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detection Section -->
+  <section id="detect" class="section detect-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>AI Chest X-Ray Analysis</h2>
+        <p>Upload a chest X-ray (JPEG/PNG) for instant AI-powered analysis.</p>
+      </div>
+      <div class="detect-wrapper">
+        <div class="upload-area glass" id="dropZone">
+          <div class="upload-content">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 16V4M8 8L12 4L16 8"/>
+              <path d="M4 16L4 18C4 19.1046 4.89543 20 6 20L18 20C19.1046 20 20 19.1046 20 18L20 16"/>
+            </svg>
+            <p>Drag & drop or click to upload</p>
+            <span>PNG or JPEG (max 10MB)</span>
+            <input type="file" id="fileInput" accept="image/jpeg,image/png" hidden/>
+          </div>
+        </div>
+        <div id="previewBox" class="preview-card glass hidden">
+          <img id="previewImg" alt="X-Ray Preview"/>
+          <button id="analyseBtn" class="btn-primary">Analyze X-Ray</button>
+        </div>
+        <div id="loader" class="loading-state hidden">
+          <div class="spinner"></div>
+          <p>AI is analyzing the image...</p>
+        </div>
+        <div id="resultBox" class="result-card glass hidden">
+          <div id="verdictBanner" class="verdict-banner"></div>
+
+          <!-- Severity Box (from earlier) -->
+          <div id="severityBox" style="display:none; margin-bottom:1rem; padding:0.75rem; border-radius:8px; background:var(--bg2); text-align:center;">
+            <strong>📏 Severity Score</strong><br>
+            <span id="severityPercent"></span><br>
+            <div style="background:#1e293b; border-radius:10px; margin:8px 0; height:12px; width:100%;">
+              <div id="severityBar" style="height:12px; border-radius:10px; width:0%; transition:width 0.3s;"></div>
+            </div>
+            <span id="severityDesc" style="font-size:0.85rem;"></span>
+          </div>
+
+          <!-- NEW: Reliability badge -->
+          <div id="reliabilityBadge" style="display:none; margin-bottom:1rem; padding:0.5rem 1rem; border-radius:8px; text-align:center; font-weight:500;"></div>
+
+          <!-- Results Grid: 3 columns (overlay, heatmap, Grad‑CAM) -->
+          <div class="analysis-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:1rem;">
+            <div>
+              <h4>Segmentation Overlay</h4>
+              <img id="overlayImg" style="width:100%; border-radius:8px;"/>
+            </div>
+            <div>
+              <h4>Probability Heatmap</h4>
+              <img id="heatmapImg" style="width:100%; border-radius:8px;"/>
+            </div>
+            <div>
+              <h4>Grad‑CAM (Why?)</h4>
+              <img id="gradcamImg" style="width:100%; border-radius:8px;"/>
+            </div>
+          </div>
+          <p class="disclaimer">⚕️ For educational purposes only. Always consult a physician.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- History Section -->
+  <section id="history" class="section history-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Scan History</h2>
+        <div class="section-header-line"></div>
+      </div>
+      <div id="historyTable" class="history-grid"></div>
+    </div>
+  </section>
+
+  <!-- Educational Resources -->
+  <section id="insights" class="section resources-section">
+    <div class="container">
+      <div class="section-header">
+        <h2>Pneumothorax Education Center</h2>
+        <div class="section-header-line"></div>
+      </div>
+      <div class="resources-grid">
+        <div class="resource-card glass green">
+          <h3>✅ Preventative Care</h3>
+          <ul>
+            <li>Quit smoking</li>
+            <li>Regular check-ups if high risk</li>
+            <li>Manage underlying lung conditions</li>
+          </ul>
+        </div>
+        <div class="resource-card glass red">
+          <h3>🚨 Emergency Signs</h3>
+          <ul>
+            <li>Sudden sharp chest pain</li>
+            <li>Severe shortness of breath</li>
+            <li>Rapid heart rate</li>
+          </ul>
+        </div>
+        <div class="resource-card glass blue">
+          <h3>🩺 When to See a Doctor</h3>
+          <ul>
+            <li>Persistent cough</li>
+            <li>Unexplained fatigue</li>
+            <li>Difficulty breathing after minor trauma</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Floating AI Chat Assistant -->
+  <div class="floating-chat">
+    <button class="chat-toggle" id="chatToggleBtn">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </button>
+    <div class="chat-window glass" id="chatWindow">
+      <div class="chat-header">
+        <span>PneumoAI Assistant</span>
+        <button id="chatCloseBtn">✕</button>
+      </div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="message bot">👋 Hello! I'm your AI assistant. Ask me anything about lung health, pneumothorax, or how to use this platform.</div>
+      </div>
+      <div class="chat-input-container">
+        <input type="text" id="chatInput" placeholder="Ask a question..."/>
+        <button id="chatSendBtn">Send</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Glass Navigation -->
-  <nav class="glass-nav">
-    <div class="nav-container">
-      <div class="logo">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M16 2L2 9L16 16L30 9L16 2Z" stroke="#14b8a6" stroke-width="1.5" stroke-linejoin="round"/>
-          <path d="M2 9L2 23L16 30L30 23L30 9" stroke="#14b8a6" stroke-width="1.5" stroke-linejoin="round"/>
-          <path d="M16 16L16 30" stroke="#14b8a6" stroke-width="1.5"/>
-        </svg>
-        <span>Pneumo<span class="accent">AI</span></span>
-      </div>
-      <div class="nav-links">
-        <a href="#dashboard" class="nav-link">Dashboard</a>
-        <a href="#detect" class="nav-link">Detect</a>
-        <a href="#history" class="nav-link">History</a>
-        <a href="#insights" class="nav-link">Resources</a>
-        <button id="logoutBtn" class="logout-btn">Logout</button>
-      </div>
-    </div>
-  </nav>
+</main>
 
-  <main class="main-content">
-    
-    <!-- Hero Section -->
-    <section class="hero-section">
-      <div class="hero-content">
-        <div class="hero-badge">
-          <span class="badge">AI-Powered Medical Imaging</span>
-        </div>
-        <h1>Instant Pneumothorax Detection <span class="accent">with Precision</span></h1>
-        <p>Upload a chest X-ray and get a detailed analysis including probability scores and AI-powered segmentation overlays — all in seconds.</p>
-        <div class="hero-stats">
-          <div class="stat-item">
-            <span class="stat-number" id="hero-total">—</span>
-            <span class="stat-label">Total Scans</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-number" id="hero-pos">—</span>
-            <span class="stat-label">Positive Cases</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-number" id="hero-neg">—</span>
-            <span class="stat-label">Normal Scans</span>
-          </div>
-        </div>
-        <a href="#detect" class="cta-button">Start Analysis →</a>
-      </div>
-      <div class="hero-visual">
-        <div class="lung-visual">
-          <div class="lung-outline"></div>
-        </div>
-      </div>
-    </section>
+<footer class="glass-footer">
+  <p>🫁 PneumoAI — Advanced AI for Thoracic Imaging | Model: U-Net + EfficientNet-B0</p>
+</footer>
 
-    <!-- Dashboard Section -->
-    <section id="dashboard" class="section dashboard-section">
-      <div class="container">
-        <div class="section-header">
-          <h2>Clinical Dashboard</h2>
-          <div class="section-header-line"></div>
-        </div>
-        <div class="stats-grid">
-          <div class="stat-card glass">
-            <div class="stat-icon">📋</div>
-            <div class="stat-info">
-              <span class="stat-value" id="d-total">—</span>
-              <span class="stat-title">Total Scans</span>
-            </div>
-          </div>
-          <div class="stat-card glass red">
-            <div class="stat-icon">⚠️</div>
-            <div class="stat-info">
-              <span class="stat-value" id="d-pos">—</span>
-              <span class="stat-title">Pneumothorax Detected</span>
-            </div>
-          </div>
-          <div class="stat-card glass green">
-            <div class="stat-icon">✅</div>
-            <div class="stat-info">
-              <span class="stat-value" id="d-neg">—</span>
-              <span class="stat-title">Normal Findings</span>
-            </div>
-          </div>
-          <div class="stat-card glass accent">
-            <div class="stat-icon">📈</div>
-            <div class="stat-info">
-              <span class="stat-value" id="d-conf">—</span>
-              <span class="stat-title">Avg Confidence</span>
-            </div>
-          </div>
-        </div>
-        <div class="charts-grid">
-          <div class="chart-card glass">
-            <h3>Detection Breakdown</h3>
-            <canvas id="donutChart"></canvas>
-          </div>
-          <div class="chart-card glass">
-            <h3>Global Incidence per 100k</h3>
-            <canvas id="barChart"></canvas>
-          </div>
-          <div class="chart-card glass">
-            <h3>Risk by Age Group</h3>
-            <canvas id="lineChart"></canvas>
-          </div>
-        </div>
-      </div>
-    </section>
+<script src="/static/app.js"></script>
+<script>
+  // Chatbot frontend (same as before, but kept inside HTML for completeness)
+  const chatToggle = document.getElementById('chatToggleBtn');
+  const chatWindow = document.getElementById('chatWindow');
+  const chatClose = document.getElementById('chatCloseBtn');
+  const chatSend = document.getElementById('chatSendBtn');
+  const chatInput = document.getElementById('chatInput');
+  const chatMessages = document.getElementById('chatMessages');
 
-    <!-- Detection Section -->
-    <section id="detect" class="section detect-section">
-      <div class="container">
-        <div class="section-header">
-          <h2>AI Chest X-Ray Analysis</h2>
-          <p>Upload a DICOM or standard image (JPEG/PNG) for instant AI-powered analysis.</p>
-        </div>
-        <div class="detect-wrapper">
-          <div class="upload-area glass" id="dropZone">
-            <div class="upload-content">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M12 16V4M8 8L12 4L16 8"/>
-                <path d="M4 16L4 18C4 19.1046 4.89543 20 6 20L18 20C19.1046 20 20 19.1046 20 18L20 16"/>
-              </svg>
-              <p>Drag & drop or click to upload</p>
-              <span>PNG or JPEG (max 10MB)</span>
-              <input type="file" id="fileInput" accept="image/jpeg,image/png" hidden/>
-            </div>
-          </div>
-          <div id="previewBox" class="preview-card glass hidden">
-            <img id="previewImg" alt="X-Ray Preview"/>
-            <button id="analyseBtn" class="btn-primary">Analyze X-Ray</button>
-          </div>
-          <div id="loader" class="loading-state hidden">
-            <div class="spinner"></div>
-            <p>AI is analyzing the image...</p>
-          </div>
-          <div id="resultBox" class="result-card glass hidden">
-            <div id="verdictBanner" class="verdict-banner"></div>
-            <div id="severityBox" class="severity-box">
-              <span id="severityPercent"></span>
-              <div class="severity-bar-container">
-                <div id="severityBar" class="severity-bar"></div>
-              </div>
-              <span id="severityDesc"></span>
-            </div>
-            <div class="analysis-grid">
-              <div class="analysis-item">
-                <h4>Segmentation Overlay</h4>
-                <img id="overlayImg" alt="Segmentation Overlay"/>
-              </div>
-              <div class="analysis-item">
-                <h4>Probability Heatmap</h4>
-                <img id="heatmapImg" alt="Heatmap"/>
-              </div>
-            </div>
-            <p class="disclaimer">⚕️ For educational purposes only. Always consult a physician.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- History & Insights Section -->
-    <section id="history" class="section history-section">
-      <div class="container">
-        <div class="section-header">
-          <h2>Scan History</h2>
-          <div class="section-header-line"></div>
-        </div>
-        <div id="historyTable" class="history-grid"></div>
-      </div>
-    </section>
-
-    <!-- Educational Resources -->
-    <section id="insights" class="section resources-section">
-      <div class="container">
-        <div class="section-header">
-          <h2>Pneumothorax Education Center</h2>
-          <div class="section-header-line"></div>
-        </div>
-        <div class="resources-grid">
-          <div class="resource-card glass green">
-            <h3>✅ Preventative Care</h3>
-            <ul>
-              <li>Quit smoking</li>
-              <li>Regular check-ups if high risk</li>
-              <li>Manage underlying lung conditions</li>
-            </ul>
-          </div>
-          <div class="resource-card glass red">
-            <h3>🚨 Emergency Signs</h3>
-            <ul>
-              <li>Sudden sharp chest pain</li>
-              <li>Severe shortness of breath</li>
-              <li>Rapid heart rate</li>
-            </ul>
-          </div>
-          <div class="resource-card glass blue">
-            <h3>🩺 When to See a Doctor</h3>
-            <ul>
-              <li>Persistent cough</li>
-              <li>Unexplained fatigue</li>
-              <li>Difficulty breathing after minor trauma</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Floating AI Chat Assistant -->
-    <div class="floating-chat">
-      <button class="chat-toggle" id="chatToggleBtn">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-      </button>
-      <div class="chat-window glass" id="chatWindow">
-        <div class="chat-header">
-          <span>PneumoAI Assistant</span>
-          <button id="chatCloseBtn">✕</button>
-        </div>
-        <div class="chat-messages" id="chatMessages">
-          <div class="message bot">👋 Hello! I'm your AI assistant. Ask me anything about lung health, pneumothorax, or how to use this platform.</div>
-        </div>
-        <div class="chat-input-container">
-          <input type="text" id="chatInput" placeholder="Ask a question..."/>
-          <button id="chatSendBtn">Send</button>
-        </div>
-      </div>
-    </div>
-
-  </main>
-
-  <footer class="glass-footer">
-    <p>🫁 PneumoAI — Advanced AI for Thoracic Imaging | Model: U-Net + EfficientNet-B0</p>
-  </footer>
-
-  <script src="/static/app.js"></script>
-  <script>
-    // Chatbot functionality (same as before, integrated with new UI)
-    const chatToggle = document.getElementById('chatToggleBtn');
-    const chatWindow = document.getElementById('chatWindow');
-    const chatClose = document.getElementById('chatCloseBtn');
-    const chatSend = document.getElementById('chatSendBtn');
-    const chatInput = document.getElementById('chatInput');
-    const chatMessages = document.getElementById('chatMessages');
-
+  if (chatToggle) {
     chatToggle.addEventListener('click', () => {
       chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
       if (chatWindow.style.display === 'flex') chatInput.focus();
     });
-    chatClose.addEventListener('click', () => chatWindow.style.display = 'none');
+  }
+  if (chatClose) chatClose.addEventListener('click', () => chatWindow.style.display = 'none');
 
-    async function sendMessage() {
-      const msg = chatInput.value.trim();
-      if (!msg) return;
-      addMessage(msg, true);
-      chatInput.value = '';
-      showTyping();
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) throw new Error('No token');
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ message: msg })
-        });
-        const data = await res.json();
-        hideTyping();
-        addMessage(data.reply, false);
-      } catch (err) {
-        hideTyping();
-        addMessage('❌ Sorry, I encountered an error. Please try again.', false);
-      }
+  async function sendMessage() {
+    const msg = chatInput.value.trim();
+    if (!msg) return;
+    addMessage(msg, true);
+    chatInput.value = '';
+    showTyping();
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) throw new Error('No token');
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ message: msg })
+      });
+      const data = await res.json();
+      hideTyping();
+      addMessage(data.reply, false);
+    } catch (err) {
+      hideTyping();
+      addMessage('❌ Sorry, I encountered an error. Please try again.', false);
     }
+  }
 
-    function addMessage(text, isUser) {
-      const div = document.createElement('div');
-      div.className = `message ${isUser ? 'user' : 'bot'}`;
-      div.innerText = text;
-      chatMessages.appendChild(div);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
+  function addMessage(text, isUser) {
+    const div = document.createElement('div');
+    div.className = `message ${isUser ? 'user' : 'bot'}`;
+    div.innerText = text;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 
-    function showTyping() {
-      const typingDiv = document.createElement('div');
-      typingDiv.className = 'typing-indicator';
-      typingDiv.id = 'typingIndicator';
-      typingDiv.innerText = 'AI is thinking...';
-      chatMessages.appendChild(typingDiv);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
+  function showTyping() {
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'typing-indicator';
+    typingDiv.id = 'typingIndicator';
+    typingDiv.innerText = 'AI is thinking...';
+    chatMessages.appendChild(typingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 
-    function hideTyping() {
-      const typing = document.getElementById('typingIndicator');
-      if (typing) typing.remove();
-    }
+  function hideTyping() {
+    const typing = document.getElementById('typingIndicator');
+    if (typing) typing.remove();
+  }
 
-    chatSend.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-    chatWindow.style.display = 'none';
-  </script>
+  if (chatSend) chatSend.addEventListener('click', sendMessage);
+  if (chatInput) chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+  if (chatWindow) chatWindow.style.display = 'none';
+</script>
 </body>
 </html>
